@@ -1,0 +1,21 @@
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+*.tsbuildinfo
+.env*.local
+.DS_Store
+npm-debug.*
+
+# generated native folders (Expo creates these when needed)
+apps/mobile/ios
+apps/mobile/android
+
+# signing files
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem

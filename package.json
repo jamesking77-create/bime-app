@@ -1,0 +1,16 @@
+{
+  "name": "bime",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "start": "npm run start --workspace apps/mobile",
+    "web": "npm run web --workspace apps/mobile",
+    "test": "npm test --workspace packages/core",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "plan": "npm run plan --workspace packages/core"
+  }
+}
