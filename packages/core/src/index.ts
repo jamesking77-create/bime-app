@@ -1,5 +1,5 @@
 export * from "./types";
 export * from "./time";
-export { planWeek, deadline, freeWindows, RULES } from "./scheduler";
+export { planWeek, mergeWeek, deadline, freeWindows, RULES } from "./scheduler";
 export { momentum, THRESHOLDS } from "./momentum";
-export { sampleWeek, SAMPLE_DAYS } from "./sample";
+export { sampleWeek, SAMPLE_DAYS, SAMPLE_NOW, SAMPLE_SKIPPED } from "./sample";

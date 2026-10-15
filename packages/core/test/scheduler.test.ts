@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { hm, momentum, planWeek, sampleWeek } from "../src";
-import type { Block, PlanInput } from "../src";
+import { hm, mergeWeek, momentum, planWeek, SAMPLE_NOW, SAMPLE_SKIPPED, sampleWeek } from "../src";
+import type { Block, MomentumState, PlanInput } from "../src";
 
 const week = planWeek(sampleWeek);
 const study = (blocks: Block[]) => blocks.filter(b => b.slot !== "fixed");
@@ -88,6 +88,36 @@ describe("re-planning", () => {
     };
     expect(planWeek(clash).conflicts).toEqual(["CSC 101 live class clashes with work"]);
   });
+
+  it("counts sessions held earlier today toward the day's limit", () => {
+    const first = on(0).find(b => b.slot === "evening")!;
+    const replan = planWeek({
+      ...sampleWeek,
+      now: { day: 0, min: hm(19, 55) },
+      done: { "phy-lec3": 25, [first.itemId]: first.end - first.start },
+      earlier: [first],
+    });
+    expect(on(0, replan.blocks).filter(b => b.slot === "evening")).toHaveLength(1);
+  });
+
+  it("keeps sessions that already started and takes the rest from the re-plan", () => {
+    const now = { day: 0, min: hm(20, 5) };
+    const fresh = planWeek({ ...sampleWeek, now, done: { "phy-lec3": 25 }, missed: ["mth-lec4"] });
+    const merged = mergeWeek(week.blocks, fresh.blocks, now);
+    expect(on(0, merged).map(b => [b.itemId, b.start])).toEqual([
+      ["phy-lec3", hm(12, 30)],
+      ["mth-lec4", hm(19)],
+      ["gst-u1", hm(20)],
+      ["mth-lec4", hm(20, 5)],
+      ["gst-u1", hm(21, 5)],
+    ]);
+  });
+
+  it("never repeats a fixed event that is under way", () => {
+    const now = { day: 2, min: hm(20, 30) };
+    const merged = mergeWeek(week.blocks, planWeek({ ...sampleWeek, now }).blocks, now);
+    expect(merged.filter(b => b.itemId === "mth-live")).toHaveLength(1);
+  });
 });
 
 describe("momentum on Wednesday at 7:42pm", () => {
@@ -118,7 +148,12 @@ describe("momentum on Wednesday at 7:42pm", () => {
   it("is Danger when a test is close and its prep is behind, whatever the score", () => {
     const m = stateIf(b => b.day === 1 && b.slot === "evening");
     expect(m).toMatchObject({ pct: 71, state: "danger" });
-    expect(m.risks).toEqual(["GST 101 test in 47 hours with 30 of 90 prep minutes done"]);
+    expect(m.risks).toEqual([{ itemId: "gst-test", title: "GST 101 test", hoursAway: 47, prepDone: 30, prepTotal: 90 }]);
+  });
+
+  it.each<MomentumState>(["thriving", "ontrack", "slipping", "danger"])("has a sample scenario that lands on %s", state => {
+    expect(SAMPLE_NOW).toEqual(now);
+    expect(stateIf(SAMPLE_SKIPPED[state]).state).toBe(state);
   });
 
   it("gives no verdict before an hour has been planned", () => {

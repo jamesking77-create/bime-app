@@ -1,5 +1,5 @@
 import { hm } from "./time";
-import type { Commitment, DayProfile, Item, PlanInput } from "./types";
+import type { Block, Commitment, DayProfile, Item, Moment, MomentumState, PlanInput } from "./types";
 
 // King's sample week (12 to 18 October 2026), used by the tests and by the app
 // until real data entry exists. Work hours and chores times are assumptions.
@@ -41,4 +41,18 @@ export const sampleWeek: PlanInput = {
   items,
   courseOrder: ["GST 101", "MTH 101", "CSC 101", "PHY 101"],
   now: { day: 0, min: hm(6) },
+};
+
+/** Wednesday at 7:42pm, the moment the prototype and doc 04 use. */
+export const SAMPLE_NOW: Moment = { day: 2, min: hm(19, 42) };
+
+/**
+ * Four ways the sample week could have gone by SAMPLE_NOW, one per momentum
+ * state (doc 04, section 4). Each picks out the planned sessions that were skipped.
+ */
+export const SAMPLE_SKIPPED: Record<MomentumState, (b: Block) => boolean> = {
+  thriving: () => false,
+  ontrack: b => b.day === 2 && b.slot === "evening",
+  slipping: b => b.day === 0 && b.slot === "evening",
+  danger: b => b.day === 1 && b.slot === "evening",
 };

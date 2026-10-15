@@ -1,5 +1,5 @@
 import { abs, DAY } from "./time";
-import type { Block, DayProfile, Item, PlanInput, PlanResult } from "./types";
+import type { Block, DayProfile, Item, Moment, PlanInput, PlanResult } from "./types";
 
 // The planning rules from 04-data-model-and-scheduling.md, section 2.
 export const RULES = {
@@ -82,6 +82,12 @@ export function planWeek(input: PlanInput): PlanResult {
       blocks.push({ day, start: f.at!.min, end: f.at!.min + f.mins, itemId: f.id, title: f.title, course: f.course, slot: "fixed" });
     }
     let sessions = fixedToday.filter(f => f.kind === "live").length;
+    if (day === now.day) {
+      for (const b of input.earlier ?? []) {
+        if (b.slot === "evening") sessions++;
+        perCourse.set(b.course, (perCourse.get(b.course) ?? 0) + 1);
+      }
+    }
 
     const pick = (start: number, room: number, lunch: boolean, windowEnd: number): Item | undefined => {
       const at = abs(day, start);
@@ -164,4 +170,16 @@ export function planWeek(input: PlanInput): PlanResult {
 
   blocks.sort((x, y) => abs(x.day, x.start) - abs(y.day, y.start));
   return { blocks, shortfalls, conflicts };
+}
+
+/**
+ * The week after a re-plan. Sessions that started before `now` keep their planned
+ * times, so momentum can still measure them; the fresh plan takes over from `now`.
+ * Don't re-plan while a session is running.
+ */
+export function mergeWeek(previous: Block[], fresh: Block[], now: Moment): Block[] {
+  const nowAbs = abs(now.day, now.min);
+  const started = (b: Block) => abs(b.day, b.start) < nowAbs;
+  return [...previous.filter(started), ...fresh.filter(b => !started(b))]
+    .sort((x, y) => abs(x.day, x.start) - abs(y.day, y.start));
 }

@@ -87,6 +87,8 @@ export interface PlanInput {
   done?: Record<string, number>;
   /** Items whose planned session was missed this week. */
   missed?: string[];
+  /** Sessions already held earlier today; they count toward today's limits. */
+  earlier?: Block[];
 }
 
 export interface PlanResult {
@@ -97,11 +99,20 @@ export interface PlanResult {
   conflicts: string[];
 }
 
+/** A test that is close with less than half its preparation done. */
+export interface Risk {
+  itemId: string;
+  title: string;
+  hoursAway: number;
+  prepDone: number;
+  prepTotal: number;
+}
+
 export interface Momentum {
   /** Share of the plan done so far, or null before an hour has been planned. */
   pct: number | null;
   doneMins: number;
   plannedMins: number;
-  risks: string[];
+  risks: Risk[];
   state: MomentumState;
 }

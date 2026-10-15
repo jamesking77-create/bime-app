@@ -1,102 +1,98 @@
-import { useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useState } from "react";
+import { StyleSheet, View } from "react-native";
 import { router } from "expo-router";
-import { clock, planWeek, sampleWeek, SAMPLE_DAYS } from "@bime/core";
-import type { Block } from "@bime/core";
-import { Plant } from "../components/Plant";
-import { StateIcon } from "../components/StateIcon";
-import { colors, space, stateColor, stateName, TOUCH } from "../theme";
+import { clock } from "@bime/core";
+import { headline, scoreLine } from "../data/copy";
+import { targetFor, useLockIn } from "../data/lockin";
+import { LEVEL_NAME, useWeek, when } from "../data/week";
+import { Cloche } from "../ui/Cloche";
+import { Glass } from "../ui/Glass";
+import { Key } from "../ui/Key";
+import { PreviewSwitch } from "../ui/PreviewSwitch";
+import { Screen } from "../ui/Screen";
+import { StateChip } from "../ui/StateChip";
+import { Timeline } from "../ui/Timeline";
+import { T } from "../ui/type";
+import { describeDay, Vials } from "../ui/Vials";
+import { stateColor } from "../ui/tokens";
 
-// Today, driven by the shared planner. Until course entry exists it shows the
-// sample week, on the same weekday as today.
+const DAY_KIND = { onsite: "Onsite day", remote: "Work from home", off: "Day off", review: "Review day" } as const;
+
+// Today: how the week is going, and the one next thing to do.
 export default function Today() {
-  const day = (new Date().getDay() + 6) % 7; // Monday = 0
-  const { blocks, profile } = useMemo(() => {
-    const plan = planWeek(sampleWeek);
-    return { blocks: plan.blocks.filter(b => b.day === day), profile: sampleWeek.profiles[day] };
-  }, [day]);
+  const week = useWeek();
+  const lock = useLockIn();
+  const [day, setDay] = useState(week.now.day);
+  const { momentum: m, profile, next, now } = week;
+  const light = stateColor[m.state];
+  const planned = week.days.reduce((sum, d) => sum + d.planned, 0);
+  const studied = week.days.reduce((sum, d) => sum + d.done, 0);
 
-  const study = blocks.filter(b => b.slot !== "fixed");
-  const next = study.find(b => b.slot === "evening") ?? study[0];
-  const state = "ontrack" as const;
-  const headline = study.length
-    ? `${study.length} ${study.length === 1 ? "session" : "sessions"} today. First: ${next?.title} at ${clock(next!.start)}.`
-    : "Nothing planned today. Enjoy the rest.";
+  let footer;
+  if (lock.phase !== "idle" && lock.target) {
+    footer = <Key title="Back to lock-in" sub={lock.target.title} color={light} onPress={() => router.navigate("/lock-in")} />;
+  } else if (next) {
+    footer = (
+      <Key
+        title={`Start ${next.title}`}
+        sub={`${next.end - next.start} min · planned ${when(next, now)}`}
+        color={light}
+        onPress={() => {
+          lock.start(targetFor(next, profile.level));
+          router.navigate("/lock-in");
+        }}
+      />
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.screen} edges={["top"]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.date}>{SAMPLE_DAYS[day]} · {profile.kind === "onsite" ? "Onsite day" : profile.kind === "remote" ? "Work from home" : "Day off"}</Text>
-
-        <View style={styles.hero}>
-          <Plant state={state} />
-          <View style={styles.heroText}>
-            <View style={[styles.chip, { backgroundColor: stateColor[state] + "26" }]}>
-              <StateIcon state={state} color={stateColor[state]} />
-              <Text style={[styles.chipText, { color: stateColor[state] }]}>{stateName[state]}</Text>
-            </View>
-            <Text style={styles.headline}>{headline}</Text>
-          </View>
-        </View>
-
-        <Text style={styles.notice}>This is the sample week. Your own courses come next.</Text>
-
-        <View style={styles.timeline}>
-          {profile.workStart !== undefined && (
-            <Row time={clock(profile.workStart)} title="Work" sub={`Until ${clock(profile.workEnd!)}`} dim />
-          )}
-          {blocks.map(b => (
-            <Row key={`${b.itemId}-${b.start}`} time={clock(b.start)} title={b.title + (b.part ? ` (part ${b.part})` : "")} sub={subFor(b)} live={b.slot === "fixed"} />
-          ))}
-        </View>
-
-        {next && (
-          <Pressable style={({ pressed }) => [styles.cta, pressed && { transform: [{ scale: 0.97 }] }]} onPress={() => router.push("/lock-in")} accessibilityRole="button">
-            <Text style={styles.ctaTitle}>Start {next.course}</Text>
-            <Text style={styles.ctaSub}>{next.end - next.start} min · {next.title}</Text>
-          </Pressable>
-        )}
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-function subFor(b: Block): string {
-  if (b.slot === "fixed") return "Fixed · reminder 10 min before";
-  if (b.slot === "lunch") return `Lunch break · ${b.end - b.start} min`;
-  return `${b.level === "locked" ? "Locked" : b.level === "focused" ? "Focused" : "Gentle"} · ${b.end - b.start} min`;
-}
-
-function Row({ time, title, sub, dim, live }: { time: string; title: string; sub: string; dim?: boolean; live?: boolean }) {
-  return (
-    <View style={styles.row}>
-      <Text style={styles.time}>{time}</Text>
-      <View style={[styles.slot, dim && { opacity: 0.6 }, live && { borderColor: colors.live }]}>
-        <Text style={styles.slotTitle}>{title}</Text>
-        <Text style={styles.slotSub}>{sub}</Text>
+    <Screen footer={footer}>
+      <View style={styles.top}>
+        <T v="label">{week.date}</T>
+        <T v="meta">
+          {clock(now.min)} · {DAY_KIND[profile.kind]} · {LEVEL_NAME[profile.level]} lock-in
+        </T>
       </View>
-    </View>
+
+      <View style={styles.hero}>
+        <Cloche state={m.state} size={172} />
+        <StateChip state={m.state} />
+        <T v="hero" style={styles.center}>
+          {headline(week)}
+        </T>
+        <T v="meta" style={styles.center}>
+          {scoreLine(week)}
+        </T>
+      </View>
+
+      <Glass radius={22} style={styles.pane}>
+        <View style={styles.paneHead}>
+          <T v="label">This week</T>
+          <T v="meta">
+            {studied} of {planned} min studied
+          </T>
+        </View>
+        <Vials days={week.days} selected={day} onSelect={setDay} />
+        <T v="meta" style={styles.center}>
+          {describeDay(week.days[day])}
+        </T>
+      </Glass>
+
+      <View style={styles.section}>
+        <T v="label">Today</T>
+        <Timeline rows={week.rows} light={light} />
+      </View>
+
+      {__DEV__ && <PreviewSwitch value={week.preview} onChange={week.setPreview} />}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.ink },
-  content: { padding: space.lg, gap: space.md },
-  date: { color: colors.muted, fontSize: 14 },
-  hero: { flexDirection: "row", gap: space.md, alignItems: "center", backgroundColor: colors.panel, borderRadius: 20, padding: space.lg },
-  heroText: { flex: 1, gap: space.sm },
-  chip: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  chipText: { fontSize: 13, fontWeight: "700" },
-  headline: { color: colors.text, fontSize: 20, fontWeight: "700", lineHeight: 26 },
-  notice: { color: colors.muted, fontSize: 13 },
-  timeline: { gap: space.sm },
-  row: { flexDirection: "row", gap: space.md, alignItems: "stretch" },
-  time: { color: colors.muted, width: 64, paddingTop: 12, fontSize: 13, fontVariant: ["tabular-nums"] },
-  slot: { flex: 1, backgroundColor: colors.panel, borderRadius: 14, padding: space.md, borderWidth: 1, borderColor: "transparent", minHeight: TOUCH },
-  slotTitle: { color: colors.text, fontSize: 15, fontWeight: "600" },
-  slotSub: { color: colors.muted, fontSize: 13, marginTop: 2 },
-  cta: { backgroundColor: colors.teal, borderRadius: 16, paddingVertical: 14, alignItems: "center", minHeight: TOUCH, marginTop: space.sm },
-  ctaTitle: { color: colors.ink, fontSize: 17, fontWeight: "700" },
-  ctaSub: { color: colors.ink, fontSize: 13, opacity: 0.8 },
+  top: { gap: 4 },
+  hero: { alignItems: "center", gap: 10 },
+  center: { textAlign: "center" },
+  pane: { padding: 16, gap: 14 },
+  paneHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
+  section: { gap: 12 },
 });

@@ -1,5 +1,5 @@
 import { abs } from "./time";
-import type { Block, Item, Moment, Momentum, MomentumState } from "./types";
+import type { Block, Item, Moment, Momentum, MomentumState, Risk } from "./types";
 
 export const THRESHOLDS = {
   /** Below this share of the plan: Danger. */
@@ -34,7 +34,7 @@ export function momentum(args: {
   const doneMins = Object.values(done).reduce((sum, m) => sum + m, 0);
   const pct = plannedMins < THRESHOLDS.minPlannedMins ? null : Math.round((doneMins / plannedMins) * 100);
 
-  const risks: string[] = [];
+  const risks: Risk[] = [];
   for (const test of items.filter(i => i.kind === "test" && i.at)) {
     const hoursAway = (abs(test.at!.day, test.at!.min) - nowAbs) / 60;
     if (hoursAway < 0 || hoursAway > THRESHOLDS.riskHours) continue;
@@ -42,7 +42,7 @@ export function momentum(args: {
     const prepTotal = prep.reduce((sum, i) => sum + i.mins, 0);
     const prepDone = prep.reduce((sum, i) => sum + Math.min(done[i.id] ?? 0, i.mins), 0);
     if (prepDone < prepTotal / 2) {
-      risks.push(`${test.title} in ${Math.round(hoursAway)} hours with ${prepDone} of ${prepTotal} prep minutes done`);
+      risks.push({ itemId: test.id, title: test.title, hoursAway: Math.round(hoursAway), prepDone, prepTotal });
     }
   }
 

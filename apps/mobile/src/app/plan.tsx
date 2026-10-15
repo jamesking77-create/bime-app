@@ -1,4 +1,4 @@
-import { ComingNext } from "../components/ComingNext";
+import { ComingNext } from "../ui/ComingNext";
 
 export default function Plan() {
   return <ComingNext title="Plan" body="Coming later: your work days, commitments and lock-in level for each day of the week." />;
